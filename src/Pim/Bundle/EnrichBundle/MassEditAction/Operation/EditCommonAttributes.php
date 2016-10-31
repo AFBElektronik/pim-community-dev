@@ -59,9 +59,6 @@ class EditCommonAttributes extends AbstractMassEditOperation
     protected $productValueConverter;
 
     /** @var string */
-    protected $tmpStorageDir;
-
-    /** @var string */
     protected $attributeLocale;
 
     /** @var string */
@@ -95,7 +92,6 @@ class EditCommonAttributes extends AbstractMassEditOperation
         LocalizerRegistryInterface $localizerRegistry,
         CollectionFilterInterface $productValuesFilter,
         ConverterInterface $productValueConverter,
-        $tmpStorageDir,
         $jobInstanceCode
     ) {
         parent::__construct($jobInstanceCode);
@@ -105,7 +101,6 @@ class EditCommonAttributes extends AbstractMassEditOperation
         $this->attributeRepository = $attributeRepository;
         $this->productUpdater = $productUpdater;
         $this->productValidator = $productValidator;
-        $this->tmpStorageDir = $tmpStorageDir;
         $this->internalNormalizer = $internalNormalizer;
         $this->localizedConverter = $localizedConverter;
         $this->localizerRegistry = $localizerRegistry;
@@ -166,6 +161,7 @@ class EditCommonAttributes extends AbstractMassEditOperation
     {
         $data = json_decode($this->values, true);
 
+        $data = $this->productValueConverter->convert($data);
         $data = $this->filterScopableAndLocalizableData(
             $data,
             $this->getAttributeLocale(),
@@ -173,7 +169,6 @@ class EditCommonAttributes extends AbstractMassEditOperation
         );
         $data = $this->productValuesFilter->filterCollection($data, 'pim.internal_api.product_values_data.edit');
         $data = $this->delocalizeData($data, $this->userContext->getUiLocale()->getCode());
-        $data = $this->storeUploadedFile($data);
 
         $this->values = json_encode($data);
     }
@@ -298,16 +293,16 @@ class EditCommonAttributes extends AbstractMassEditOperation
     protected function storeUploadedFile(array $data)
     {
         $filesystem = new Filesystem();
-
+        return $data;
         foreach ($data as $code => $values) {
             foreach ($values as $index => $value) {
-                if (isset($value['data']['filePath']) && '' !== $value['data']['filePath']) {
-                    $uploadedFile = new \SplFileInfo($value['data']['filePath']);
+                if (isset($value['data']) && '' !== $value['data']) {
+                    $uploadedFile = new \SplFileInfo($value['data']);
                     $newPath = $this->tmpStorageDir . DIRECTORY_SEPARATOR . $uploadedFile->getFilename();
 
                     $filesystem->rename($uploadedFile->getPathname(), $newPath);
 
-                    $data[$code][$index]['data']['filePath'] = $newPath;
+                    $data[$code][$index]['data'] = $newPath;
                 }
             }
         }
